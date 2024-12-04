@@ -15,8 +15,20 @@ fn parse1(input: &str) -> u32 {
         .sum()
 }
 
+fn sanitize_str(input: &str) -> String {
+    let re = Regex::new(r"\n").unwrap();
+    let oneline = re.replace_all(input, "");
+
+    let re = Regex::new(r"don't\(\).*?do\(\)").unwrap();
+    let cleaned = re.replace_all(&oneline, "");
+
+    // tricksy hobbitses
+    let re = Regex::new(r"don't\(\).*$").unwrap();
+    re.replace_all(&cleaned, "").to_string()
+}
+
 fn parse2(input: &str) -> u32 {
-    0
+    parse1(&sanitize_str(input))
 }
 
 #[cfg(test)]
@@ -24,6 +36,8 @@ mod tests {
     use super::*;
 
     const TEST1: &'static str = r#"xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))"#;
+
+    const TEST2: &'static str = r#"xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))"#;
 
     const INPUT: &'static str = include_str!("../input.txt");
 
@@ -35,7 +49,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST2, parse2), 48);
+        assert_eq!(solve(INPUT, parse2), 63866497);
     }
 }
