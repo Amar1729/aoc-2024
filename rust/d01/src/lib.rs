@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use std::iter::zip;
 
 fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
@@ -37,6 +38,40 @@ fn parse1(input: &str) -> u32 {
         .sum()
 }
 
+fn map_inc(map: &mut HashMap<u32, usize>, k: u32) {
+    *map.entry(k).or_default() += 1;
+}
+
+fn parse2(input: &str) -> u32 {
+    let mut vals: HashMap<u32, usize> = HashMap::from([]);
+    let mut sims: HashMap<u32, usize> = HashMap::from([]);
+
+    for line in input
+        .lines()
+        .filter(|line| !line.trim().is_empty()) {
+
+        // still learning, sue me.
+        let mut parts = line.split_whitespace();
+        let left = parts.next().unwrap().parse::<u32>().ok().unwrap();
+        let right = parts.next().unwrap().parse::<u32>().ok().unwrap();
+
+        map_inc(&mut vals, left);
+        map_inc(&mut sims, right);
+    }
+
+    println!("{:?}", vals);
+    println!("{:?}", sims);
+
+    vals
+        .iter()
+        .map(|(&val, count)| {
+            let similarity = sims.entry(val).or_default();
+
+            val * (*count as u32) * (*similarity as u32)
+        })
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -58,9 +93,9 @@ mod tests {
         assert_eq!(solve(INPUT, parse1), 2166959);
     }
 
-    // #[test]
-    // fn test2() {
-    //     assert_eq!(solve(TEST2, parse2), 11);
-    //     assert_eq!(solve(INPUT, parse2), 0);
-    // }
+    #[test]
+    fn test2() {
+        assert_eq!(solve(TEST1, parse2), 31);
+        assert_eq!(solve(INPUT, parse2), 23741109);
+    }
 }
