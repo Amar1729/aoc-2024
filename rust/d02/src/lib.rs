@@ -1,31 +1,56 @@
 #![allow(dead_code)]
 
-fn check_levels(report: Vec<i32>) -> bool {
+fn diffs(report: Vec<isize>) -> Vec<isize> {
     let mut it = report.iter();
     let mut curr = it.next().unwrap();
-    let mut diff;
+
+    it
+        .map(|level| {
+            let d = level - curr;
+            curr = level;
+            d
+        })
+        .collect()
+}
+
+fn check_levels(report: Vec<isize>) -> bool {
     let mut prev = 0;
 
-    for lvl in it {
-        diff = curr - lvl;
-        curr = lvl;
-
-        if diff < 0 && prev > 0 {
+    for d in diffs(report) {
+        if d < 0 && prev > 0 {
             return false;
         }
 
-        if diff > 0 && prev < 0 {
+        if d > 0 && prev < 0 {
             return false;
         }
 
-        if diff < -3 || diff == 0 || diff > 3 {
+        if d < -3 || d == 0 || d > 3 {
             return false;
         }
 
-        prev = diff;
+        prev = d;
     }
 
     true
+}
+
+fn check_levels_dumb(report: Vec<isize>) -> bool {
+    // i apologize for my crimes against humanity
+
+    if check_levels(report.clone()) {
+        return true;
+    }
+
+    for x in 0 .. report.len() {
+        let mut new_report = report[0 .. x].to_vec();
+        new_report.extend_from_slice(&report[x+1 .. report.len()]);
+        if check_levels(new_report) {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
@@ -37,7 +62,7 @@ fn parse1(input: &str) -> u32 {
         .lines()
         .map(|line| {
             line.split_whitespace()
-                .map(|s| s.parse::<i32>().unwrap())
+                .map(|s| s.parse::<isize>().unwrap())
                 .collect()
         })
         .map(|report| check_levels(report))
@@ -46,7 +71,16 @@ fn parse1(input: &str) -> u32 {
 }
 
 fn parse2(input: &str) -> u32 {
-    0
+    input
+        .lines()
+        .map(|line| {
+            line.split_whitespace()
+                .map(|s| s.parse::<isize>().unwrap())
+                .collect()
+        })
+        .map(|report| check_levels_dumb(report))
+        .filter(|&b| b)
+        .count() as u32
 }
 
 #[cfg(test)]
@@ -70,7 +104,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST1, parse2), 4);
+        assert_eq!(solve(INPUT, parse2), 612);
     }
 }
