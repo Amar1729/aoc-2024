@@ -17,6 +17,7 @@ fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
     parse(input)
 }
 
+/// Find XMAS
 fn parse1(input: &str) -> u32 {
     let (_, it) = utils::parse_with_lens(input, &|b| {b as char});
 
@@ -58,8 +59,55 @@ fn parse1(input: &str) -> u32 {
         .sum()
 }
 
+/// Find an X'd MAS (two MAS in shape of X)
 fn parse2(input: &str) -> u32 {
-    0
+    let (_, it) = utils::parse_with_lens(input, &|b| {b as char});
+
+    let mut map = HashMap::new();
+    let mut start_points = HashSet::new();
+
+    for (coord, letter) in it {
+        // shift the coordinate so i can keep it as usize and still do subtraction.
+        let shifted = (coord.0 + 3, coord.1 + 3);
+
+        map.insert(shifted, letter);
+
+        if letter == 'A' {
+            start_points.insert(shifted);
+        }
+    }
+
+    start_points.iter()
+        .filter_map(|(x, y)| {
+            // let tl = *map.get(&(x-1, y+1))? as u8;
+            // let tr = *map.get(&(x+1, y+1))? as u8;
+            // let bl = *map.get(&(x-1, y-1))? as u8;
+            // let br = *map.get(&(x+1, y-1))? as u8;
+
+            let mut p1 = [
+                *map.get(&(x-1, y+1))? as u8,
+                *map.get(&(x+1, y-1))? as u8,
+            ];
+            p1.sort();
+
+            let mut p2 = [
+                *map.get(&(x+1, y+1))? as u8,
+                *map.get(&(x-1, y-1))? as u8,
+            ];
+            p2.sort();
+
+            // i had this idea for checking that each pair consists of exactly one S and one M.
+            // i wasn't confident it would give the right answer - turns out it does, same as
+            // creating the sorted slice and checking the values explicitly.
+            // if (tl ^ br == 30) && (tr ^ bl == 30) {
+
+            if (p1 == [77, 83]) && (p2 == [77, 83]) {
+                Some(1)
+            } else {
+                Some(0)
+            }
+        })
+        .sum::<u32>()
 }
 
 #[cfg(test)]
@@ -87,7 +135,7 @@ MXMXAXMASX"#;
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST1, parse2), 9);
+        assert_eq!(solve(INPUT, parse2), 1982);
     }
 }
