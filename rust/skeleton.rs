@@ -1,4 +1,4 @@
-#[allow(dead_code)]
+#![allow(dead_code)]
 
 fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
     parse(input)
