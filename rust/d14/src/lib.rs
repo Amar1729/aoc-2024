@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
-#[derive(Debug)]
+use std::collections::HashSet;
+
+#[derive(Clone, Debug)]
 struct Vector {
     p: (isize, isize),
     v: (isize, isize),
@@ -53,6 +55,29 @@ fn quad_count(robots: &Vec<Vector>, bounds: (isize, isize)) -> (usize, usize, us
     (tl, tr, bl, br)
 }
 
+fn construct_grid(robots: &Vec<Vector>, bounds: (isize, isize)) -> String {
+    let mut mapping = HashSet::new();
+
+    for robot in robots {
+        mapping.insert(robot.p);
+    }
+
+    let mut s = String::new();
+
+    for y in 0 .. (bounds.1 as usize) {
+        for x in 0 .. (bounds.0 as usize) {
+            if mapping.contains(&(x as isize, y as isize)) {
+                s.push('#');
+            } else {
+                s.push(' ');
+            }
+        }
+        s.push('\n');
+    }
+
+    s
+}
+
 fn solve(input: &str, bounds: (isize, isize), parse: fn(&str, (isize, isize)) -> u32) -> u32 {
     parse(input, bounds)
 }
@@ -72,7 +97,28 @@ fn parse1(input: &str, bounds: (isize, isize)) -> u32 {
 
 fn parse2(input: &str, bounds: (isize, isize)) -> u32 {
     // lol. i think i know what p2 will look like!
-    0
+    // update - i did not! it's a graphics challenge!!!
+
+    let mut robots: Vec<Vector> = input.lines().map(|line| Vector::from(line)).collect();
+
+    // total assumption that the problem is looking for something vaguely pretty.
+    // just watch what happens and ctrl-c 
+    for i in 0 .. {
+
+        let s = construct_grid(&robots, bounds);
+
+        if s.contains("###########") {
+            println!("==== {i} ====");
+            print!("{}", s);
+            println!("==== {i} ====");
+
+            return i;
+        }
+
+        time_step(&mut robots, bounds);
+    }
+
+    panic!()
 }
 
 #[cfg(test)]
@@ -106,7 +152,8 @@ p=9,5 v=-3,-3"#;
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, TEST1_BOUNDS, parse2), 0);
-        assert_eq!(solve(INPUT, INPUT_BOUNDS, parse2), 0);
+        // test input won't make funny pic
+        // assert_eq!(solve(TEST1, TEST1_BOUNDS, parse2), 0);
+        assert_eq!(solve(INPUT, INPUT_BOUNDS, parse2), 7774);
     }
 }
