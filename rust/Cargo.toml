@@ -7,6 +7,7 @@ members = [
     "d04",
     "d05",
     "d13",
+    "d14",
     "utils",
 ]
 resolver = "2"
