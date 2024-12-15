@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
+
 fn blink(rocks: &Vec<usize>) -> Vec<usize> {
     let mut new_rocks = vec![];
 
@@ -22,29 +24,58 @@ fn blink(rocks: &Vec<usize>) -> Vec<usize> {
     new_rocks
 }
 
-fn solve(input: &str, blinks: usize, parse: fn(&str, usize) -> u32) -> u32 {
+fn blink_better(rocks: &HashMap<usize, u64>) -> HashMap<usize, u64> {
+    let mut new_rocks = HashMap::new();
+
+    for (rock, count) in rocks.iter() {
+        if *rock == 0 {
+            *new_rocks.entry(1).or_insert(0) += count;
+        } else if rock.to_string().len() % 2 == 0 {
+            let string = rock.to_string();
+
+            let left = &string[.. string.len() / 2];
+            let right = &string[string.len() / 2 ..];
+
+            *new_rocks.entry(left.parse().unwrap()).or_insert(0) += count;
+            *new_rocks.entry(right.parse().unwrap()).or_insert(0) += count;
+        } else {
+            *new_rocks.entry(2024 * *rock).or_insert(0) += count;
+        }
+    }
+
+    new_rocks
+}
+
+fn solve(input: &str, blinks: usize, parse: fn(&str, usize) -> u64) -> u64 {
     parse(input, blinks)
 }
 
-fn parse1(input: &str, blinks: usize) -> u32 {
-    let mut rocks: Vec<usize> = input
+fn parse1(input: &str, blinks: usize) -> u64 {
+    let rocks: Vec<usize> = input
         .lines()
         .next().unwrap()
         .split_whitespace()
         .map(|n| n.parse::<usize>().unwrap())
         .collect();
 
-    println!("{:?}", rocks);
-
-    for _ in 0 .. blinks {
-        rocks = blink(&mut rocks);
+    let mut rocks_count: HashMap<usize, u64> = HashMap::new();
+    for rock in &rocks {
+        *rocks_count.entry(*rock).or_insert(0) += 1;
     }
 
-    rocks.len() as u32
+    for _ in 0 .. blinks {
+        // println!("{}", rocks.len());
+        rocks_count = blink_better(&rocks_count);
+    }
+
+    rocks_count
+        .iter()
+        .map(|(_, v)| v)
+        .sum()
 }
 
-fn parse2(input: &str, blinks: usize) -> u32 {
-    0
+fn parse2(input: &str, blinks: usize) -> u64 {
+    parse1(input, blinks)
 }
 
 #[cfg(test)]
@@ -62,13 +93,12 @@ mod tests {
         assert_eq!(solve(TEST1, 1, parse1), 7);
         assert_eq!(solve(TEST2, 6, parse1), 22);
         assert_eq!(solve(TEST2, 25, parse1), 55312);
-        assert_eq!(solve(INPUT, 25, parse1), 0);
+        assert_eq!(solve(INPUT, 25, parse1), 197357
+);
     }
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, 0, parse2), 0);
-        assert_eq!(solve(TEST2, 0, parse2), 0);
-        assert_eq!(solve(INPUT, 25, parse2), 0);
+        assert_eq!(solve(INPUT, 75, parse2), 234568186890978);
     }
 }
