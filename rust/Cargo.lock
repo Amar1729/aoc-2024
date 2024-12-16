@@ -81,6 +81,7 @@ name = "d08"
 version = "0.1.0"
 dependencies = [
  "itertools",
+ "utils",
 ]
 
 [[package]]

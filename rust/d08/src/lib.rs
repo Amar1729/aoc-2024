@@ -1,36 +1,27 @@
 #![allow(dead_code)]
 
 use std::collections::{HashMap, HashSet};
+use utils::{Point, parse_with_lens};
 use itertools::Itertools;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-struct Point {
-    x: isize,
-    y: isize,
-}
 
 fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
     parse(input)
 }
 
-// TODO: parametrize this and move to utils.
 fn parse_grid(input: &str) -> (usize, usize, HashMap<Point, char>) {
-    let (mut width, mut height) = (0, 0);
-    let mut points = HashMap::new();
+    let ((width, height), it) = parse_with_lens(input, &|b| b as char);
 
-    for (y, line) in input.lines().enumerate() {
-        width = line.len();
-
-        for (x, c) in line.chars().enumerate() {
+    let points = it
+        .filter_map(|(p, c)| {
             if c != '.' {
-                points.insert(Point { x: x as isize, y: y as isize }, c);
+                Some((Point::from(p), c))
+            } else {
+                None
             }
-        }
+        })
+        .collect();
 
-        height = y;
-    }
-
-    (width, height + 1, points)
+    (width, height, points)
 }
 
 // TODO: parametrize this and move to utils.
@@ -50,43 +41,29 @@ fn print_grid(width: usize, height: usize, nodes: &HashMap<Point, char>, antinod
     }
 }
 
-fn find_antinodes(p1: &Point, p2: &Point, slope: (isize, isize), width: usize, height: usize, part2: bool) -> Vec<Point> {
+fn find_antinodes(p1: &Point, p2: &Point, slope: &Point, width: usize, height: usize, part2: bool) -> Vec<Point> {
     let mut antinodes = Vec::new();
 
     if part2 {
         // check in one direction
-        let mut cx = p1.x;
-        let mut cy = p1.y;
-
-        while cx >= 0 && cx < width as isize && cy >= 0 && cy < height as isize {
-            antinodes.push(Point { x: cx, y: cy });
-
-            cx += slope.0;
-            cy += slope.1;
+        let mut curr = p1.clone();
+        while curr.contained(width, height) {
+            antinodes.push(curr);
+            curr += *slope;
         }
 
         // check in the other direction
-        let mut cx = p2.x;
-        let mut cy = p2.y;
-
-        while cx >= 0 && cx < width as isize && cy >= 0 && cy < height as isize {
-            antinodes.push(Point { x: cx, y: cy });
-
-            cx -= slope.0;
-            cy -= slope.1;
+        let mut curr = p2.clone();
+        while curr.contained(width, height) {
+            antinodes.push(curr);
+            curr -= *slope;
         }
     } else {
         for anti in &[
-            Point {
-                x: p1.x + slope.0,
-                y: p1.y + slope.1,
-            },
-            Point {
-                x: p2.x - slope.0,
-                y: p2.y - slope.1,
-            },
+            *p1 + *slope,
+            *p2 - *slope,
         ] {
-            if anti.x >= 0 && anti.x < width as isize && anti.y >= 0 && anti.y < height as isize {
+            if anti.contained(width, height) {
                 antinodes.push(*anti);
             }
         }
@@ -119,9 +96,9 @@ fn parse_and_solve(input: &str, part2: bool) -> u32 {
         for vp in filtered.combinations(2) {
             let p1 = vp[0];
             let p2 = vp[1];
-            let slope = (p1.x - p2.x, p1.y - p2.y);
+            let slope = *p1 - *p2;
 
-            for anti in find_antinodes(p1, p2, slope, width, height, part2) {
+            for anti in find_antinodes(p1, p2, &slope, width, height, part2) {
                 antinodes.insert(anti);
             }
         }
@@ -167,6 +144,6 @@ mod tests {
     #[test]
     fn test2() {
         assert_eq!(solve(TEST1, parse2), 34);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(INPUT, parse2), 1200);
     }
 }

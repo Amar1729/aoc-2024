@@ -44,7 +44,7 @@ fn parse1(input: &str) -> u32 {
                         let nx = ((d+1) as isize * dx + *x as isize) as usize;
                         let ny = ((d+1) as isize * dy + *y as isize) as usize;
 
-                        match map.get(&(nx, ny)) {
+                        match map.get(&(nx as isize, ny as isize)) {
                             Some(b) => {
                                 if b != target { return 0; }
                             },
