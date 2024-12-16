@@ -34,33 +34,76 @@ fn rules_and_updates<'a>(
     (rules, updates_it)
 }
 
+fn is_correct_update(update: &Vec<usize>, rules: &HashMap<usize, Vec<usize>>) -> bool {
+    for (idx, page) in update.iter().enumerate() {
+        for already_page in update[0 .. idx].iter() {
+            if let Some(deps) = rules.get(page) {
+                if deps.contains(already_page) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    true
+}
+
 fn parse1(input: &str) -> u32 {
     let (rules, updates) = rules_and_updates(input);
 
     updates
         .filter_map(|update| {
-            let mut medianth = 0;
-
-            for (idx, page) in update.iter().enumerate() {
-                if idx % 2 == 0 { medianth += 1; }
-
-                for already_page in update[0 .. idx].iter() {
-                    // invalid!
-                    if let Some(deps) = rules.get(page) {
-                        if deps.contains(already_page) {
-                            return None;
-                        }
-                    }
-                }
+            if is_correct_update(&update, &rules) {
+                Some(update[(update.len() - 1) / 2] as u32)
+            } else {
+                None
             }
-
-            Some(update[medianth-1] as u32)
         })
         .sum()
 }
 
 fn parse2(input: &str) -> u32 {
-    0
+    let (rules, updates) = rules_and_updates(input);
+
+    updates
+        .filter_map(|update| {
+            if is_correct_update(&update, &rules) {
+                None
+            } else {
+                let mut new_update = Vec::new();
+                let mut queue = update.clone();
+
+                while !queue.is_empty() {
+                    match queue
+                        .clone()
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, page)| {
+                            match rules.get(page) {
+                                Some(deps) => {
+                                    for d in deps {
+                                        if queue.contains(d) {
+                                            return None;
+                                        }
+                                    }
+                                    Some((idx, page))
+                                },
+                                None => Some((idx, page)),
+                            }
+                        })
+                        .next() {
+                        Some((idx, page)) => {
+                            new_update.push(*page);
+                            queue.remove(idx);
+                        },
+                        None => {},
+                    }
+                }
+
+                Some(new_update[(new_update.len() - 1) / 2])
+            }
+        })
+        .sum::<usize>() as u32
 }
 
 #[cfg(test)]
@@ -108,7 +151,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST1, parse2), 123);
+        assert_eq!(solve(INPUT, parse2), 5502);
     }
 }
