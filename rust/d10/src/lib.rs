@@ -19,7 +19,7 @@ fn parse_grid(input: &str) -> HashMap<Point, usize> {
         .collect()
 }
 
-fn parse1(input: &str) -> u32 {
+fn traverse(input: &str, part1: bool) -> u32 {
     let grid = parse_grid(input);
 
     grid
@@ -31,8 +31,10 @@ fn parse1(input: &str) -> u32 {
             let mut queue = vec![(*p, *d)];
 
             while let Some((cp, cd)) = queue.pop() {
-                if visited.contains(&cp) { continue }
-                visited.insert(cp);
+                if part1 {
+                    if visited.contains(&cp) { continue }
+                    visited.insert(cp);
+                }
 
                 for adj in &[
                     cp + Point::from((-1, 0)),
@@ -42,10 +44,12 @@ fn parse1(input: &str) -> u32 {
                 ] {
                     if let Some(cost) = grid.get(&adj) {
                         if *cost == cd + 1 {
-                            if *cost == 9 && !visited.contains(&adj) {
+                            if *cost == 9 && (!part1 || part1 && !visited.contains(&adj)) {
                                 // done!
                                 finishes += 1;
-                                visited.insert(*adj);
+                                if part1 {
+                                    visited.insert(*adj);
+                                }
                             } else {
                                 // keep looking
                                 queue.push((*adj, *cost));
@@ -60,8 +64,12 @@ fn parse1(input: &str) -> u32 {
         .sum()
 }
 
+fn parse1(input: &str) -> u32 {
+    traverse(input, true)
+}
+
 fn parse2(input: &str) -> u32 {
-    0
+    traverse(input, false)
 }
 
 #[cfg(test)]
@@ -93,7 +101,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST2, parse2), 81);
+        assert_eq!(solve(INPUT, parse2), 1432);
     }
 }
