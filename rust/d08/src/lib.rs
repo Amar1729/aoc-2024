@@ -50,7 +50,52 @@ fn print_grid(width: usize, height: usize, nodes: &HashMap<Point, char>, antinod
     }
 }
 
-fn parse1(input: &str) -> u32 {
+fn find_antinodes(p1: &Point, p2: &Point, slope: (isize, isize), width: usize, height: usize, part2: bool) -> Vec<Point> {
+    let mut antinodes = Vec::new();
+
+    if part2 {
+        // check in one direction
+        let mut cx = p1.x;
+        let mut cy = p1.y;
+
+        while cx >= 0 && cx < width as isize && cy >= 0 && cy < height as isize {
+            antinodes.push(Point { x: cx, y: cy });
+
+            cx += slope.0;
+            cy += slope.1;
+        }
+
+        // check in the other direction
+        let mut cx = p2.x;
+        let mut cy = p2.y;
+
+        while cx >= 0 && cx < width as isize && cy >= 0 && cy < height as isize {
+            antinodes.push(Point { x: cx, y: cy });
+
+            cx -= slope.0;
+            cy -= slope.1;
+        }
+    } else {
+        for anti in &[
+            Point {
+                x: p1.x + slope.0,
+                y: p1.y + slope.1,
+            },
+            Point {
+                x: p2.x - slope.0,
+                y: p2.y - slope.1,
+            },
+        ] {
+            if anti.x >= 0 && anti.x < width as isize && anti.y >= 0 && anti.y < height as isize {
+                antinodes.push(*anti);
+            }
+        }
+    }
+
+    antinodes
+}
+
+fn parse_and_solve(input: &str, part2: bool) -> u32 {
     let (width, height, points) = parse_grid(input);
 
     let labels: HashSet<char> = points
@@ -76,19 +121,8 @@ fn parse1(input: &str) -> u32 {
             let p2 = vp[1];
             let slope = (p1.x - p2.x, p1.y - p2.y);
 
-            for anti in &[
-                Point {
-                    x: p1.x + slope.0,
-                    y: p1.y + slope.1,
-                },
-                Point {
-                    x: p2.x - slope.0,
-                    y: p2.y - slope.1,
-                },
-            ] {
-                if anti.x >= 0 && anti.x < width as isize && anti.y >= 0 && anti.y < height as isize {
-                    antinodes.insert(*anti);
-                }
+            for anti in find_antinodes(p1, p2, slope, width, height, part2) {
+                antinodes.insert(anti);
             }
         }
     }
@@ -97,8 +131,12 @@ fn parse1(input: &str) -> u32 {
     antinodes.len() as u32
 }
 
+fn parse1(input: &str) -> u32 {
+    parse_and_solve(input, false)
+}
+
 fn parse2(input: &str) -> u32 {
-    0
+    parse_and_solve(input, true)
 }
 
 #[cfg(test)]
@@ -128,7 +166,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
+        assert_eq!(solve(TEST1, parse2), 34);
         assert_eq!(solve(INPUT, parse2), 0);
     }
 }
