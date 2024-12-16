@@ -1,14 +1,15 @@
 #![allow(dead_code)]
 
+use rayon::prelude::*;
 use std::collections::HashSet;
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct Point {
     x: isize,
     y: isize,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct Guard {
     x: isize,
     y: isize,
@@ -50,11 +51,13 @@ fn parse_input(input: &str) -> (Guard, HashSet<Point>, Point) {
     )
 }
 
-fn parse1(input: &str) -> u32 {
-    let (mut guard, obstacles, bounds) = parse_input(input);
-
+fn traverse(
+    guard: &mut Guard,
+    obstacles: &HashSet<Point>,
+    bounds: &Point,
+) -> Option<HashSet<(isize, isize)>> {
     let mut points = HashSet::new();
-    points.insert((guard.x, guard.y));
+    points.insert(guard.clone());
 
     loop {
         match guard.facing {
@@ -109,15 +112,48 @@ fn parse1(input: &str) -> u32 {
             //     println!();
             // }
 
-            return points.len() as u32;
+            // for p2 we want to first know all the points on the path.
+            // return points.len() as u32;
+            // deduplicate
+            let mut dedup = HashSet::new();
+            for point in points.iter().map(|p| ( p.x, p.y )).collect::<Vec<(isize, isize)>>() {
+                dedup.insert(point);
+            }
+            return Some(dedup);
         }
 
-        points.insert((guard.x, guard.y));
+        if points.contains(&guard) {
+            // guard's already been here while facing the current direction. we're in a loop.
+            return None;
+        } else {
+            points.insert(guard.clone());
+        }
     }
 }
 
+fn parse1(input: &str) -> u32 {
+    let (mut guard, obstacles, bounds) = parse_input(input);
+    // assumed to work for p1
+    traverse(&mut guard, &obstacles, &bounds).unwrap().len() as u32
+}
+
 fn parse2(input: &str) -> u32 {
-    0
+    let (mut guard, obstacles, bounds) = parse_input(input);
+    let orig_guard: Guard = guard.clone();
+    traverse(&mut guard, &obstacles, &bounds)
+        .unwrap()
+        // absolute efficiency hack, boom
+        .par_iter()
+        .filter_map(|point| {
+            let mut new_obstacles = obstacles.clone();
+            // new_obstacles.insert(Point { x: point.x, y: point.y });
+            new_obstacles.insert(Point { x: point.0, y: point.1 });
+            match traverse(&mut orig_guard.clone(), &new_obstacles, &bounds) {
+                Some(_) => None,
+                None => Some(1),
+            }
+        })
+        .sum()
 }
 
 #[cfg(test)]
@@ -145,7 +181,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST1, parse2), 6);
+        assert_eq!(solve(INPUT, parse2), 1304);
     }
 }
