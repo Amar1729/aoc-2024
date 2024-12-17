@@ -11,8 +11,8 @@ struct Claw {
     b_y: u32,
 
     // where's the prize
-    prize_x: u32,
-    prize_y: u32,
+    prize_x: u64,
+    prize_y: u64,
 }
 
 fn line_parse(line: &str) -> (u32, u32) {
@@ -45,39 +45,44 @@ impl Claw {
             a_y: b_a.1,
             b_x: b_b.0,
             b_y: b_b.1,
-            prize_x: prize.0,
-            prize_y: prize.1,
+            prize_x: prize.0 as u64,
+            prize_y: prize.1 as u64,
         }
     }
 
-    // start from fewest to most button presses of A (the more expensive one)
-    // see if we can find any integral solution by combining A and B presses
-    // if not, fail
-    fn solve(&self) -> Result<(u32, u32), bool> {
-        // i assume p2 will increase our search space.
-        // wonder if rust will be BLAZINGLY FAST enough.
-        for mult_a in 0..101 {
-            let x = mult_a * self.a_x;
-            let y = mult_a * self.a_y;
+    fn cramer(&self) -> Option<(i64, i64)> {
+        // (am i dumb? this is so obvious lol)
+        // det: ad - bc
 
-            if self.prize_x > x && self.prize_y > y {
-                if (self.prize_x - x) % self.b_x == 0 && (self.prize_y - y) % self.b_y == 0 {
-                    let mult_b = (self.prize_x - x) / self.b_x;
-                    if mult_b < 101 && mult_b == (self.prize_y - y) / self.b_y {
-                        println!("{x} {y} {mult_a} {mult_b}");
-                        return Ok((mult_a, mult_b));
-                    }
-                }
+        // kind of gross assignment and logic in this function, sorry
+
+        let a = self.a_x as u64;
+        let b = self.b_x as u64;
+        let c = self.a_y as u64;
+        let d = self.b_y as u64;
+
+        let det_a = (a * d) as i64 - (b * c) as i64;
+
+        let det_x = (self.prize_x * d) as i64 - (self.prize_y * b) as i64;
+        let det_y = (a * self.prize_y) as i64 - (c * self.prize_x) as i64;
+
+        let num_a = det_x / det_a;
+        let num_b = det_y / det_a;
+
+        if num_a < 0 || num_b < 0 { return None };
+
+        if !(num_a as u64 * a as u64 + num_b as u64 * b as u64 == self.prize_x as u64) {
+            if !(num_a as u64 * c as u64 + num_b as u64 * d as u64 == self.prize_y as u64) {
+                return None
             }
-
         }
 
-        Err(false)
+        Some((num_a, num_b))
     }
 
-    fn cost(&self) -> u32 {
-        if let Ok((a, b)) = self.solve() {
-            3*a + b
+    fn cost(&self) -> u64 {
+        if let Some((a, b)) = self.cramer() {
+            (3*a + b).abs().try_into().unwrap()
         } else {
             0
         }
@@ -107,18 +112,27 @@ fn parse_buttons(input: &str) -> Vec<Claw> {
     claws
 }
 
-fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
+fn solve(input: &str, parse: fn(&str) -> u64) -> u64 {
     parse(input)
 }
 
-fn parse1(input: &str) -> u32 {
-    let claws = parse_buttons(input);
-    
-    claws.iter().map(|c| {c.cost()}).sum()
+fn parse1(input: &str) -> u64 {
+    parse_buttons(input)
+        .iter()
+        .map(|c| c.cost())
+        .sum()
 }
 
-fn parse2(input: &str) -> u32 {
-    0
+fn parse2(input: &str) -> u64 {
+    let diff: u64 = 10_000_000_000_000;
+    parse_buttons(input)
+        .iter_mut()
+        .map(|c| {
+            c.prize_x += diff;
+            c.prize_y += diff;
+            c.cost()
+        })
+        .sum()
 }
 
 #[cfg(test)]
@@ -151,7 +165,6 @@ Prize: X=18641, Y=10279"#;
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(INPUT, parse2), 82570698600470);
     }
 }
