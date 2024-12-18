@@ -76,25 +76,41 @@ fn parse2(input: &str, bounds: (isize, isize), initial: usize) -> String {
         bytes_v.push(iter.next().unwrap());
     }
 
-    let mut bytes = into_grid(bytes_v);
+    let bytes = into_grid(bytes_v);
 
-    for new_byte in iter {
-        let parts: Vec<usize> = new_byte
-            .split(',')
-            .map(|c| c.parse().unwrap())
-            .collect();
-        let p = Point::from((parts[0] as isize, parts[1] as isize));
-        bytes.insert(p);
+    let falling_bytes: Vec<Point> = iter
+        .map(|b| {
+            let parts: Vec<usize> = b.split(',')
+                .map(|c| c.parse().unwrap())
+                .collect();
+            Point::from((parts[0] as isize, parts[1] as isize))
+        })
+        .collect();
 
-        match traverse(bounds, &bytes) {
-            None => {
-                return new_byte.to_string();
-            },
-            _ => {},
+    let mut small = initial;
+    let mut big = initial + falling_bytes.len();
+    let mut idx = small + (big - small) / 2;
+
+    // nice and simple binary search over the rest of the bytes
+    while idx != small {
+        println!("{small} {idx} {big}");
+        let mut fallen = bytes.clone();
+        for byte in &falling_bytes[..idx-initial] {
+            fallen.insert(*byte);
         }
+
+        match traverse(bounds, &fallen) {
+            // failed to find a path: lower the upper bound
+            None => big = idx,
+            // still found a path: increase the lower bound
+            _ => small = idx,
+        };
+
+        idx = small + (big - small) / 2;
     }
 
-    panic!()
+    let byte = falling_bytes[idx - initial];
+    format!("{},{}", byte.x, byte.y)
 }
 
 #[cfg(test)]
