@@ -1,0 +1,8 @@
+[package]
+name = "d18"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pathfinding = "4.12.0"
+utils = { path = "../utils" }
