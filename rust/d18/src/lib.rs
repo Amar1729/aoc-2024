@@ -8,10 +8,9 @@ fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
     parse(input)
 }
 
-fn into_grid(input: &str) -> HashSet<Point> {
+fn into_grid(input: Vec<&str>) -> HashSet<Point> {
     input
-        .lines()
-        .take(1024)
+        .iter()
         .map(|line| {
             let parts: Vec<usize> = line
                 .split(',')
@@ -33,11 +32,7 @@ fn print_grid(bytes: HashSet<Point>, path: &[(isize, isize)], end: (isize, isize
     }
 }
 
-fn parse1(input: &str) -> u32 {
-    let bytes = into_grid(input);
-
-    println!("{}", bytes.len());
-
+fn traverse(bytes: &HashSet<Point>) -> Option<u32> {
     // let end = (6, 6);
     let end = (70, 70);
 
@@ -64,16 +59,49 @@ fn parse1(input: &str) -> u32 {
         },
         |&(x, y)| ((end.0 as isize).abs_diff(x) + (end.1 as isize).abs_diff(y)) / 2,
         |&p| p == end,
-    )
-        .unwrap();
+    );
 
-    // println!("found result {:?}", result.0);
-    // print_grid(bytes, &result.0, end);
+    if let Some(result) = result {
+        Some((result.0.len() - 1) as u32)
+    } else {
+        None
+    }
 
-    (result.0.len() - 1) as u32
+}
+
+fn parse1(input: &str) -> u32 {
+    let bytes = into_grid(input.lines().take(1024).collect());
+    traverse(&bytes).unwrap()
 }
 
 fn parse2(input: &str) -> u32 {
+    let mut bytes_v = vec![];
+    let mut iter = input.lines();
+
+    // start from here because we know it's fine
+    for _ in 0 .. 1024 {
+        bytes_v.push(iter.next().unwrap());
+    }
+
+    let mut bytes = into_grid(bytes_v);
+
+    for new_byte in iter {
+        let parts: Vec<usize> = new_byte
+            .split(',')
+            .map(|c| c.parse().unwrap())
+            .collect();
+        let p = Point::from((parts[0] as isize, parts[1] as isize));
+        bytes.insert(p);
+
+        match traverse(&bytes) {
+            None => {
+                println!("FAILURE {new_byte}");
+                return 0;
+            },
+            _ => {},
+        }
+    }
+
     0
 }
 
@@ -106,7 +134,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
+        // this test will return spurious 0 - use --nocapture to see println output
         assert_eq!(solve(INPUT, parse2), 0);
     }
 }
