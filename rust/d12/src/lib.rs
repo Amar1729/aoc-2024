@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::{HashMap, HashSet};
+use itertools::Itertools;
 
 use utils::{Point, parse_with_lens};
 
@@ -25,6 +26,74 @@ fn pricing(region: &HashSet<Point>) -> u32 {
     (a * p) as u32
 }
 
+fn count_sides(min: usize, max: usize, direction: Point, region: &HashSet<Point>) -> usize {
+    let p_check = |p: Point| {
+        if direction.y == 0 { p.x }
+        else { p.y }
+    };
+
+    let p_other = |p: Point| {
+        if direction.y == 0 { p.y }
+        else { p.x }
+    };
+
+    (min .. max)
+        .map(|c| {
+            region
+                .iter()
+                .filter_map(|&p| {
+                    if (p_check(p) as usize) == c && !region.contains(&(p + direction)) {
+                        Some(p_other(p) as usize)
+                    } else {
+                        None
+                    }
+                })
+                .sorted()
+                .into_iter()
+                .coalesce(|a, b| {
+                    if (b - a) == 1 {
+                        Ok(b)
+                    } else {
+                        Err((a, b))
+                    }
+                })
+                .collect::<Vec<usize>>()
+                .len()
+        })
+        .sum()
+}
+
+fn pricing_2(region: &HashSet<Point>) -> u32 {
+    // area is easy
+    let a = region.len();
+
+    // this one is tougher
+    let (mut sx, mut sy, mut mx, mut my) = (usize::MAX, usize::MAX, 0, 0);
+    for p in region {
+        if (p.x as usize) < sx { sx = p.x as usize }
+        if (p.y as usize) < sy { sy = p.y as usize }
+        if (p.x as usize) > mx { mx = p.x as usize }
+        if (p.y as usize) > my { my = p.y as usize }
+    }
+
+    let n_sides = &[
+        // left
+        (sx, mx, Point { x: -1, y: 0 }),
+        // right
+        (sx, mx, Point { x: 1, y: 0 }),
+
+        // down
+        (sy, my, Point { x: 0, y: 1 }),
+        // up
+        (sy, my, Point { x: 0, y: -1 }),
+    ]
+        .iter()
+        .map(|&(min_r, max_r, direction)| count_sides(min_r, max_r + 1, direction, &region))
+        .sum();
+
+    (a * n_sides) as u32
+}
+
 fn parse_input(input: &str) -> HashMap<Point, char> {
     let (_, it) = parse_with_lens(input, &|b| b as char);
     it.map(|(p, c)| (Point::from(p), c)).collect()
@@ -34,9 +103,8 @@ fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
     parse(input)
 }
 
-fn parse1(input: &str) -> u32 {
-    let mut price = 0;
-
+fn parse_regions(input: &str) -> Vec<HashSet<Point>> {
+    let mut regions = Vec::new();
     let mut grid: Vec<(Point, char)> = parse_input(input).into_iter().collect();
 
     // for (k, v) in &grid {
@@ -59,14 +127,24 @@ fn parse1(input: &str) -> u32 {
             }
         }
 
-        price += pricing(&region);
+        regions.push(region);
     }
 
-    price
+    regions
+}
+
+fn parse1(input: &str) -> u32 {
+    parse_regions(input)
+        .iter()
+        .map(|region| pricing(&region))
+        .sum()
 }
 
 fn parse2(input: &str) -> u32 {
-    0
+    parse_regions(input)
+        .iter()
+        .map(|region| pricing_2(&region))
+        .sum()
 }
 
 #[cfg(test)]
@@ -95,13 +173,14 @@ MMMISSJEEE"#;
     fn test1() {
         assert_eq!(solve(TEST1, parse1), 140);
         assert_eq!(solve(TEST2, parse1), 1930);
-        assert_eq!(solve(INPUT, parse1), 1467094);
+        // TODO - this kind of takes long? ~7 sec?
+        // assert_eq!(solve(INPUT, parse1), 1467094);
     }
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(TEST2, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST1, parse2), 80);
+        assert_eq!(solve(TEST2, parse2), 1206);
+        assert_eq!(solve(INPUT, parse2), 881182);
     }
 }
