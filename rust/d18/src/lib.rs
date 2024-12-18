@@ -4,10 +4,6 @@ use pathfinding::prelude::astar;
 use utils::Point;
 use std::collections::HashSet;
 
-fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
-    parse(input)
-}
-
 fn into_grid(input: Vec<&str>) -> HashSet<Point> {
     input
         .iter()
@@ -32,10 +28,7 @@ fn print_grid(bytes: HashSet<Point>, path: &[(isize, isize)], end: (isize, isize
     }
 }
 
-fn traverse(bytes: &HashSet<Point>) -> Option<u32> {
-    // let end = (6, 6);
-    let end = (70, 70);
-
+fn traverse(end: (isize, isize), bytes: &HashSet<Point>) -> Option<u32> {
     let result = astar(
         &(0, 0),
         |&(x, y)| {
@@ -69,17 +62,17 @@ fn traverse(bytes: &HashSet<Point>) -> Option<u32> {
 
 }
 
-fn parse1(input: &str) -> u32 {
-    let bytes = into_grid(input.lines().take(1024).collect());
-    traverse(&bytes).unwrap()
+fn parse1(input: &str, bounds: (isize, isize), initial: usize) -> u32 {
+    let bytes = into_grid(input.lines().take(initial).collect());
+    traverse(bounds, &bytes).unwrap()
 }
 
-fn parse2(input: &str) -> u32 {
+fn parse2(input: &str, bounds: (isize, isize), initial: usize) -> String {
     let mut bytes_v = vec![];
     let mut iter = input.lines();
 
     // start from here because we know it's fine
-    for _ in 0 .. 1024 {
+    for _ in 0 .. initial {
         bytes_v.push(iter.next().unwrap());
     }
 
@@ -93,16 +86,15 @@ fn parse2(input: &str) -> u32 {
         let p = Point::from((parts[0] as isize, parts[1] as isize));
         bytes.insert(p);
 
-        match traverse(&bytes) {
+        match traverse(bounds, &bytes) {
             None => {
-                println!("FAILURE {new_byte}");
-                return 0;
+                return new_byte.to_string();
             },
             _ => {},
         }
     }
 
-    0
+    panic!()
 }
 
 #[cfg(test)]
@@ -120,21 +112,32 @@ mod tests {
 0,6
 3,3
 2,6
-5,1"#;
-
-    // const TEST2: &'static str = r#""#;
+5,1
+1,2
+5,5
+2,5
+6,5
+1,4
+0,4
+6,4
+1,1
+6,1
+1,0
+0,5
+1,6
+2,0"#;
 
     const INPUT: &'static str = include_str!("../input.txt");
 
     #[test]
     fn test1() {
-        // assert_eq!(solve(TEST1, parse1), 22);
-        assert_eq!(solve(INPUT, parse1), 292);
+        assert_eq!(parse1(TEST1, (6, 6), 12), 22);
+        assert_eq!(parse1(INPUT, (70, 70), 1024), 292);
     }
 
     #[test]
     fn test2() {
-        // this test will return spurious 0 - use --nocapture to see println output
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(parse2(TEST1, (6, 6), 12), "6,1");
+        assert_eq!(parse2(INPUT, (70, 70), 1024), "58,44");
     }
 }
