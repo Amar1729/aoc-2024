@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
+fn solve(input: &str, parse: fn(&str) -> u64) -> u64 {
     parse(input)
 }
 
@@ -20,42 +20,41 @@ fn parse_input(input: &str) -> (HashSet<&str>, Vec<&str>) {
     (towels, patterns)
 }
 
-fn is_possible(pattern: &str, towels: &HashSet<&str>) -> bool {
-    println!("Pattern: {pattern}");
+fn count_possible<'a>(pattern: &'a str, towels: &HashSet<&str>, memo: &mut HashMap<&'a str, u64>) -> u64 {
+    if let Some(&c) = memo.get(pattern) { return c; }
 
-    if pattern.trim().is_empty() {
-        println!("Success!");
-        return true;
-    }
+    if pattern.trim().is_empty() { return 1; }
 
+    let mut count = 0;
     for towel in towels {
         if pattern.starts_with(towel) {
-            println!("Using towel: {towel}");
-            match is_possible(&pattern[towel.len()..], &towels) {
-                true => return true,
-                // otherwise keep going
-                false => {},
-            };
+            count += count_possible(&pattern[towel.len()..], &towels, memo);
         }
     }
 
-    false
+    *memo.entry(pattern).or_insert(0) += count;
+    count
 }
 
-fn parse1(input: &str) -> u32 {
+fn parse1(input: &str) -> u64 {
     let (towels, patterns) = parse_input(input);
-
-    println!("{towels:?}");
+    let mut memo = HashMap::new();
 
     patterns
         .iter()
-        .filter(|&pattern| is_possible(&pattern, &towels))
+        .filter(|&pattern| count_possible(&pattern, &towels, &mut memo) > 0)
         .collect::<Vec<_>>()
-        .len() as u32
+        .len() as u64
 }
 
-fn parse2(input: &str) -> u32 {
-    0
+fn parse2(input: &str) -> u64 {
+    let (towels, patterns) = parse_input(input);
+    let mut memo = HashMap::new();
+
+    patterns
+        .iter()
+        .map(|&pattern| count_possible(&pattern, &towels, &mut memo))
+        .sum::<u64>()
 }
 
 #[cfg(test)]
@@ -83,7 +82,7 @@ bbrgwb"#;
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST1, parse2), 16);
+        assert_eq!(solve(INPUT, parse2), 619970556776002);
     }
 }
