@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
 use core::fmt;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 struct Map {
     walls: HashSet<(usize, usize)>,
-    boxes: HashSet<(usize, usize)>,
+    boxes: HashMap<(usize, usize), char>,
     bot: (usize, usize),
 
     height: usize,
@@ -20,8 +20,8 @@ impl fmt::Display for Map {
             for x in 0 .. self.width {
                 if self.walls.contains(&(x, y)) {
                     s.push('#');
-                } else if self.boxes.contains(&(x, y)) {
-                    s.push('O');
+                } else if let Some(&c) = self.boxes.get(&(x, y)) {
+                    s.push(c);
                 } else if self.bot == (x, y) {
                     s.push('@');
                 } else {
@@ -36,22 +36,37 @@ impl fmt::Display for Map {
 }
 
 impl Map {
-    fn from(lines: Vec<&str>) -> Map {
+    fn from(lines: Vec<&str>, part2: bool) -> Map {
         let mut walls = HashSet::new();
-        let mut boxes = HashSet::new();
+        let mut boxes = HashMap::new();
         let mut bot = (0, 0);
         let mut width = 0;
 
         for (y, line) in lines.iter().enumerate() {
-            width = line.len();
+            width = line.len() + (part2 as usize * line.len());
 
             for (x, c) in line.chars().enumerate() {
-                match c {
-                    '#' => _ = walls.insert((x, y)),
-                    'O' => _ = boxes.insert((x, y)),
-                    '@' => bot = (x, y),
-                    _ => {},
-                };
+                if !part2 {
+                    match c {
+                        '#' => _ = walls.insert((x, y)),
+                        'O' => _ = boxes.insert((x, y), 'O'),
+                        '@' => bot = (x, y),
+                        _ => {},
+                    };
+                } else {
+                    match c {
+                        '#' => {
+                            walls.insert((2*x, y));
+                            walls.insert((2*x+1, y));
+                        },
+                        'O' => {
+                            boxes.insert((2*x, y), '[');
+                            boxes.insert((2*x+1, y), ']');
+                        },
+                        '@' => bot = (2*x, y),
+                        _ => {},
+                    };
+                }
             }
         }
 
@@ -74,46 +89,84 @@ impl Map {
         }
     }
 
-    fn find_next_empty(&self, direction: char) -> Option<(Option<(usize, usize)>, (usize, usize))> {
+    fn try_move(&mut self, direction: char, coord: (isize, isize)) -> bool {
+        let uc = (coord.0 as usize, coord.1 as usize);
+        let m = self.get_movement(direction);
+        if self.walls.contains(&uc) {
+            false
+        } else if let Some(c) = self.boxes.get(&uc).cloned() {
 
-        let movement = self.get_movement(direction);
-        let mut boxes_found = false;
+            match (c, direction == '<' || direction == '>') {
+                ('O', _) => {
+                    let nc = (coord.0 + m.0, coord.1 + m.1);
+                    let b = self.try_move(direction, nc);
+                    if b {
+                        self.boxes.remove(&uc);
+                        self.boxes.insert((nc.0 as usize, nc.1 as usize), 'O');
+                        true
+                    } else {
+                        false
+                    }
+                },
 
-        let mut cx = self.bot.0 as isize;
-        let mut cy = self.bot.1 as isize;
+                // left/right
+                (_, true) => {
+                    let nc = (coord.0 + m.0, coord.1 + m.1);
+                    let b = self.try_move(direction, nc);
+                    if b {
+                        self.boxes.remove(&uc);
+                        self.boxes.insert((nc.0 as usize, nc.1 as usize), c);
+                        true
+                    } else {
+                        false
+                    }
+                },
 
-        let adj = (
-            (self.bot.0 as isize + movement.0) as usize,
-            (self.bot.1 as isize + movement.1) as usize,
-        );
+                // up/down
+                (_, false) => {
+                    let other_half = match c {
+                        '[' => (coord.0 + 1, coord.1),
+                        ']' => (coord.0 - 1, coord.1),
+                        _ => panic!(),
+                    };
+                    let other_c = match c {
+                        '[' => ']',
+                        ']' => '[',
+                        _ => panic!(),
+                    };
+                    let nc = (coord.0 + m.0, coord.1 + m.1);
+                    let nc_other = (other_half.0 + m.0, other_half.1 + m.1);
+                    let b = self.try_move(direction, nc) &&
+                        self.try_move(direction, nc_other);
 
-        loop {
-            let next = ((cx as isize + movement.0) as usize, (cy as isize + movement.1) as usize);
-
-            if (cx + movement.0) < 0 || next.0 as usize > self.width || (cy + movement.1) < 0 || next.1 as usize > self.height {
-                return None;
-            } else if self.walls.contains(&next) {
-                return None;
-            } else if self.boxes.contains(&next) {
-                boxes_found = true;
-                cx = next.0 as isize;
-                cy = next.1 as isize;
-            } else {
-                return Some((if boxes_found { Some(adj) } else { None }, next));
+                    if b {
+                        self.boxes.remove(&uc);
+                        self.boxes.remove(&(other_half.0 as usize, other_half.1 as usize));
+                        self.boxes.insert((nc.0 as usize, nc.1 as usize), c);
+                        self.boxes.insert((nc_other.0 as usize, nc_other.1 as usize), other_c);
+                        true
+                    } else {
+                        false
+                    }
+                },
             }
+        } else {
+            true
         }
     }
 
     fn move_(&mut self, direction: char) {
-        if let Some((next_empty, last_empty)) = self.find_next_empty(direction) {
-            match next_empty {
-                Some(adj) => {
-                    self.bot = adj;
-                    self.boxes.remove(&adj);
-                    self.boxes.insert(last_empty);
-                },
-                None => { self.bot = last_empty },
-            }
+        let c = self.get_movement(direction);
+        let orig = self.boxes.clone();
+
+        let pt = (self.bot.0 as isize + c.0, self.bot.1 as isize + c.1);
+        if self.try_move(direction, pt) {
+            self.bot = (pt.0 as usize, pt.1 as usize);
+        } else {
+            // sometimes when checking up or down movements, some of the boxes may successfully
+            // move while others do not. if that is the case, reset the box state back to what it
+            // was originally.
+            self.boxes = orig;
         }
     }
 }
@@ -122,7 +175,7 @@ fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
     parse(input)
 }
 
-fn parse_input(input: &str) -> (Map, String) {
+fn parse_input(input: &str, part2: bool) -> (Map, String) {
     let mut lines = input.lines();
     let mut line = lines.next().unwrap();
 
@@ -146,13 +199,13 @@ fn parse_input(input: &str) -> (Map, String) {
     }
 
     (
-        Map::from(map_lines),
+        Map::from(map_lines, part2),
         directions,
     )
 }
 
 fn parse1(input: &str) -> u32 {
-    let (mut map, directions) = parse_input(input);
+    let (mut map, directions) = parse_input(input, false);
 
     for c in directions.chars() {
         map.move_(c);
@@ -160,12 +213,25 @@ fn parse1(input: &str) -> u32 {
 
     map.boxes
         .iter()
-        .map(|(x, y)| x + 100*y)
+        .map(|((x, y), _)| x + 100*y)
         .sum::<usize>() as u32
 }
 
 fn parse2(input: &str) -> u32 {
-    0
+    let (mut map, directions) = parse_input(input, true);
+
+    // println!("initial: {map}\n");
+
+    for c in directions.chars() {
+        map.move_(c);
+        // println!("\n{map}\n");
+    }
+
+    map.boxes
+        .iter()
+        .filter(|(_, &c)| c == '[')
+        .map(|((x, y), _)| x + 100*y)
+        .sum::<usize>() as u32
 }
 
 #[cfg(test)]
@@ -205,6 +271,16 @@ vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v
 ^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>
 v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
+    const TEST3: &'static str = r#"########
+#...#.#
+#.....#
+#..OO@#
+#..O..#
+#.....#
+#######
+
+<vv<<^^<<^^"#;
+
     const INPUT: &'static str = include_str!("../input.txt");
 
     #[test]
@@ -216,8 +292,9 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(TEST2, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        // TEST3 only for testing map steps:
+        // assert_eq!(solve(TEST3, parse2), 0);
+        assert_eq!(solve(TEST2, parse2), 9021);
+        assert_eq!(solve(INPUT, parse2), 1535509);
     }
 }
