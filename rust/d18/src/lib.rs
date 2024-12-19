@@ -68,15 +68,9 @@ fn parse1(input: &str, bounds: (isize, isize), initial: usize) -> u32 {
 }
 
 fn parse2(input: &str, bounds: (isize, isize), initial: usize) -> String {
-    let mut bytes_v = vec![];
     let mut iter = input.lines();
 
-    // start from here because we know it's fine
-    for _ in 0 .. initial {
-        bytes_v.push(iter.next().unwrap());
-    }
-
-    let bytes = into_grid(bytes_v);
+    let bytes = into_grid(iter.by_ref().take(initial).collect());
 
     let falling_bytes: Vec<Point> = iter
         .map(|b| {
