@@ -68,7 +68,7 @@ fn make_path(start: &Point, end: &Point, allowed: &HashSet<Point>) -> Vec<Point>
     let mut path = vec![curr];
 
     while curr != *end {
-        for succ in curr.successors() {
+        for succ in curr.successors(1) {
             if allowed.contains(&succ) && !path.contains(&succ) {
                 curr = succ;
                 path.push(curr);
@@ -80,7 +80,7 @@ fn make_path(start: &Point, end: &Point, allowed: &HashSet<Point>) -> Vec<Point>
     path
 }
 
-fn parse1(input: &str, threshold: usize) -> u32 {
+fn count_cheats(input: &str, cheat_len: usize, threshold: usize) -> u32 {
     let (start, end, allowed) = parse_grid(input);
     // let path = make_path(&start, &end, &allowed);
     let path_with_distances: HashMap<Point, usize> = make_path(&start, &end, &allowed)
@@ -93,11 +93,8 @@ fn parse1(input: &str, threshold: usize) -> u32 {
     path_with_distances
         .iter()
         .flat_map(|(p, orig)| {
-            // find locations at most 2 away
-            p.successors()
-                .iter()
-                .flat_map(|other| other.successors())
-                .collect::<HashSet<Point>>()
+            // find locations at most cheat_len spaces away
+            p.successors(cheat_len)
                 .iter()
                 .filter_map(|other| {
                     if let Some(dist) = path_with_distances.get(other) {
@@ -117,12 +114,21 @@ fn parse1(input: &str, threshold: usize) -> u32 {
         .sorted()
         .counts()
         .iter()
-        .map(|(_, count)| count)
+        // for debugging
+        // .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
+        .map(|(_, count)| {
+            // println!("{count} {time_saved}");
+            count
+        })
         .sum::<usize>() as u32
 }
 
-fn parse2(input: &str) -> u32 {
-    0
+fn parse1(input: &str, threshold: usize) -> u32 {
+    count_cheats(input, 2, threshold)
+}
+
+fn parse2(input: &str, threshold: usize) -> u32 {
+    count_cheats(input, 20, threshold)
 }
 
 #[cfg(test)]
@@ -149,14 +155,13 @@ mod tests {
 
     #[test]
     fn test1() {
-        // all cheats for sample (but none save more than 64)
         assert_eq!(solve(TEST1, 0, parse1), 44);
         assert_eq!(solve(INPUT, 100, parse1), 1289);
     }
 
     #[test]
     fn test2() {
-        // assert_eq!(solve(TEST1, parse2), 0);
-        // assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(TEST1, 50, parse2), 285);
+        assert_eq!(solve(INPUT, 100, parse2), 982425);
     }
 }

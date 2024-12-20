@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ops;
 
 pub type Coord = (usize, usize);
@@ -83,16 +84,28 @@ impl Point {
         self.x.abs_diff(other.x) + self.y.abs_diff(other.y)
     }
 
-    pub fn successors(&self) -> Vec<Point> {
-        [
-            (-1, 0),
-            (1, 0),
-            (0, -1),
-            (0, 1),
-        ]
-            .iter()
-            .map(|direction| *self + Point { x: direction.0, y: direction.1 })
-            .collect()
+    pub fn successors(&self, distance: usize) -> HashSet<Point> {
+        let mut succs = HashSet::new();
+        let mut queue = vec![*self];
+
+        while !queue.is_empty() {
+            let curr = queue.pop().unwrap();
+            for direction in [
+                (-1, 0),
+                (1, 0),
+                (0, -1),
+                (0, 1),
+            ]
+                .iter() {
+                let np = curr + Point { x: direction.0, y: direction.1 };
+                if np.manhattan(self) <= distance && np != *self && !succs.contains(&np) {
+                    succs.insert(np);
+                    queue.push(np);
+                }
+            }
+        }
+
+        succs
     }
 }
 
