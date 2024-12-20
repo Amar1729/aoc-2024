@@ -48,6 +48,19 @@ impl ops::SubAssign<Point> for Point {
     }
 }
 
+impl Ord for Point {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.x.cmp(&other.y)
+            .then(self.y.cmp(&other.y))
+    }
+}
+
+impl PartialOrd for Point {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl Point {
     pub fn from(c: (isize, isize)) -> Self {
         Point {
@@ -64,6 +77,22 @@ impl Point {
         } else {
             true
         }
+    }
+
+    pub fn manhattan(&self, other: &Point) -> usize {
+        self.x.abs_diff(other.x) + self.y.abs_diff(other.y)
+    }
+
+    pub fn successors(&self) -> Vec<Point> {
+        [
+            (-1, 0),
+            (1, 0),
+            (0, -1),
+            (0, 1),
+        ]
+            .iter()
+            .map(|direction| *self + Point { x: direction.0, y: direction.1 })
+            .collect()
     }
 }
 

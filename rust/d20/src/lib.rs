@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 
-use pathfinding::prelude::astar_bag;
 use itertools::Itertools;
 use utils::{Point, parse_with_lens};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 fn parse_grid(input: &str) -> (Point, Point, HashSet<Point>) {
     let mut start = Point { x: 0, y: 0 };
@@ -31,7 +30,7 @@ fn parse_grid(input: &str) -> (Point, Point, HashSet<Point>) {
     (start, end, points)
 }
 
-fn print_grid(start: &Point, end: &Point, cheat: &Point, allowed: &HashSet<Point>, path1: &[Point], path2: &[Point]) {
+fn print_grid(start: &Point, end: &Point, cheats: &[Point], allowed: &HashSet<Point>, path1: &[Point], path2: &[Point]) {
     let (mx, my) = max_xy(allowed);
 
     for y in 0 .. my+1 {
@@ -39,7 +38,7 @@ fn print_grid(start: &Point, end: &Point, cheat: &Point, allowed: &HashSet<Point
             let p = &Point { x, y };
             if start == p { print!("S") }
             else if end == p { print!("E") }
-            else if cheat == p { print!("X") }
+            else if cheats.contains(&p) { print!(" ") }
             else if path1.contains(&p) || path2.contains(&p) { print!("O") }
             else if allowed.contains(&p) { print!(".") }
             else { print!("#") }
@@ -48,39 +47,8 @@ fn print_grid(start: &Point, end: &Point, cheat: &Point, allowed: &HashSet<Point
     }
 }
 
-fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
-    parse(input)
-}
-
-fn find_path(start: &Point, end: &Point, allowed: &HashSet<Point>) -> Option<Vec<Vec<Point>>> {
-    let result = astar_bag(
-        start,
-        |&p| {
-            [
-                (-1, 0),
-                (1, 0),
-                (0, -1),
-                (0, 1),
-            ]
-                .into_iter()
-                .filter_map(|adj_step| {
-                    let adj = p + Point::from(adj_step);
-                    match allowed.contains(&adj) {
-                        true => Some((adj, 1)),
-                        false => None,
-                    }
-                })
-                .collect::<Vec<(Point, usize)>>()
-        },
-        |&p| ((end.x as isize).abs_diff(p.x) + (end.y as isize).abs_diff(p.y)) / 2,
-        |&p| p == *end,
-    );
-
-    if let Some(result) = result {
-        Some(result.0.collect())
-    } else {
-        None
-    }
+fn solve(input: &str, threshold: usize, parse: fn(&str, usize) -> u32) -> u32 {
+    parse(input, threshold)
 }
 
 fn max_xy(allowed: &HashSet<Point>) -> (isize, isize) {
@@ -94,98 +62,62 @@ fn max_xy(allowed: &HashSet<Point>) -> (isize, isize) {
     (mx, my)
 }
 
-fn find_possible_cheats(allowed: &HashSet<Point>) -> HashSet<Point> {
-    let (mx, my) = max_xy(allowed);
+/// nice and simple, since we're on a track with no dead-ends only 1 point wide.
+fn make_path(start: &Point, end: &Point, allowed: &HashSet<Point>) -> Vec<Point> {
+    let mut curr = *start;
+    let mut path = vec![curr];
 
-    let mut cheats = HashSet::new();
-
-    for x in 0 .. mx+1 {
-        for y in 0 .. my+1 {
-
-            let directions = [
-                (-1, 0),
-                (1, 0),
-                (0, -1),
-                (0, 1),
-            ].into_iter();
-
-            for v in directions.permutations(2) {
-                let p = Point { x, y };
-                let first = p + Point::from(v[0]);
-                let second = p + Point::from(v[1]);
-
-                if !allowed.contains(&p) && allowed.contains(&first) && allowed.contains(&second) {
-                    cheats.insert(p);
-                }
+    while curr != *end {
+        for succ in curr.successors() {
+            if allowed.contains(&succ) && !path.contains(&succ) {
+                curr = succ;
+                path.push(curr);
+                break;
             }
         }
     }
 
-    cheats
+    path
 }
 
-fn find_cheats(start: &Point, end: &Point, allowed: &HashSet<Point>) -> Vec<(usize, usize)> {
-    let shortest_path = find_path(&start, &end, &allowed).unwrap();
-    let shortest_len = shortest_path.iter().next().unwrap().len();
-
-    let full = find_possible_cheats(&allowed).len();
-
-    find_possible_cheats(&allowed)
-        .iter()
+fn parse1(input: &str, threshold: usize) -> u32 {
+    let (start, end, allowed) = parse_grid(input);
+    // let path = make_path(&start, &end, &allowed);
+    let path_with_distances: HashMap<Point, usize> = make_path(&start, &end, &allowed)
+        .into_iter()
+        .rev()
         .enumerate()
-        .flat_map(|(idx, &cheat)| {
-            let mut new_allowed = allowed.clone();
-            new_allowed.insert(cheat);
+        .map(|(idx, p)| (p, idx))
+        .collect();
 
-            let mut possible_cheats = Vec::new();
-
-            println!("Checking cheat: {idx} / {full} \t {cheat:?}");
-
-            if let Some(paths_first) = find_path(&start, &cheat, &new_allowed) {
-                for path1 in paths_first {
-                    let mut so_far = new_allowed.clone();
-                    for so_far_point in path1.iter() {
-                        so_far.insert(*so_far_point);
-                    }
-
-                    if let Some(paths_second) = find_path(&cheat, &end, &so_far) {
-                        for path2 in paths_second {
-                            // don't double-count cheat node
-                            let distance = path1.len() + path2.len() - 1;
-                            if shortest_len > distance {
-                                // return Some(shortest_len - distance)
-                                possible_cheats.push((shortest_len - distance, (cheat, path2[1])));
-
-                                let diff = shortest_len - distance;
-                                // println!("\n{diff}");
-                                // print_grid(&start, &end, &cheat, &allowed, &path1, &path2);
-                                // println!();
-                            }
+    path_with_distances
+        .iter()
+        .flat_map(|(p, orig)| {
+            // find locations at most 2 away
+            p.successors()
+                .iter()
+                .flat_map(|other| other.successors())
+                .collect::<HashSet<Point>>()
+                .iter()
+                .filter_map(|other| {
+                    if let Some(dist) = path_with_distances.get(other) {
+                        if *dist > orig + p.manhattan(other) && dist - orig - p.manhattan(other) >= threshold {
+                            // println!("Distance: {}", dist - orig - p.manhattan(other));
+                            // print_grid(&start, &end, &[*p, *other], &allowed, &path, &[]);
+                            // println!();
+                            return Some(dist - orig - p.manhattan(other))
                         }
                     }
-                }
 
-            }
-
-            possible_cheats
-            // None
+                    None
+                })
+                .collect::<Vec<_>>()
+                // .count()
         })
-        .sorted_by(|(d1, _), (d2, _)| Ord::cmp(d1, d2))
-        .map(|(d, _)| d)
-        .dedup_with_count()
-        .collect()
-}
-
-fn parse1(input: &str) -> u32 {
-    let (start, end, allowed) = parse_grid(input);
-    find_cheats(&start, &end, &allowed)
+        .sorted()
+        .counts()
         .iter()
-        .map(|&(c, d)| {
-            match d >= 100 {
-                true => c,
-                false => 0,
-            }
-        })
+        .map(|(_, count)| count)
         .sum::<usize>() as u32
 }
 
@@ -218,8 +150,8 @@ mod tests {
     #[test]
     fn test1() {
         // all cheats for sample (but none save more than 64)
-        // assert_eq!(solve(TEST1, parse1), 44);
-        assert_eq!(solve(INPUT, parse1), 1289);
+        assert_eq!(solve(TEST1, 0, parse1), 44);
+        assert_eq!(solve(INPUT, 100, parse1), 1289);
     }
 
     #[test]
