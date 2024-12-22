@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
-fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
+use std::collections::HashMap;
+
+fn solve(input: &str, parse: fn(&str) -> u64) -> u64 {
     parse(input)
 }
 
@@ -79,25 +81,53 @@ fn generate_move(src_c: char, dst_c: char, numeric: bool) -> String {
     last
 }
 
-fn presses(input: &str) -> String {
-    let mut sequence = input.to_string();
-
-    println!("Checking for: {input}");
-    for idx in 0 .. 3 {
-        // each robot starts on A
-        let new_sequence = "A".chars().chain(sequence.chars())
-            .zip(sequence.chars())
-            .map(|(left, right)| {
-                // println!("left, right: {left} {right}");
-                generate_move(left, right, idx == 0)
-            })
-            .collect();
-
-        println!("After {idx}, got: {new_sequence}");
-        sequence = new_sequence;
+fn dfs(subseq: String, depth: usize, memo: &mut HashMap<(String, usize), u64>) -> u64 {
+    if let Some(&result) = memo.get(&(subseq.to_owned(), depth)) {
+        return result;
     }
 
-    sequence
+    // "off-by-one" because depth=1 is the last robot, and YOU are at depth=0.
+    if depth == 1 {
+        *memo.entry((subseq.to_owned(), depth)).or_insert(0) += subseq.len() as u64;
+        return subseq.len() as u64;
+    }
+
+    let total = "A".chars().chain(subseq.chars())
+        .zip(subseq.chars())
+        .map(|(left, right)| {
+            let pair_seq = generate_move(left, right, false);
+
+            if let Some(&result) = memo.get(&(pair_seq.clone(), depth-1)) {
+                result
+            } else {
+                dfs(pair_seq, depth-1, memo)
+            }
+        })
+        .sum();
+
+    *memo.entry((subseq.to_owned(), depth)).or_insert(0) += total;
+    total
+}
+
+/// note that n_robots does NOT include the human presser
+fn presses(input: &str, n_robots: usize) -> u64 {
+    let sequence = input.to_string();
+
+    let mut memo: HashMap<(String, usize), u64> = HashMap::new();
+
+    // each robot starts on A
+    "A".chars().chain(sequence.chars())
+        .zip(sequence.chars())
+        .map(|(left, right)| {
+            let pair_seq = generate_move(left, right, true);
+            let total = dfs(pair_seq.to_owned(), n_robots, &mut memo);
+            *memo.entry((pair_seq, n_robots+1)).or_insert(0) += total;
+
+            println!("Map has grown to len / cap: {} / {}", memo.len(), memo.capacity());
+
+            total
+        })
+        .sum::<u64>()
 }
 
 fn to_number(code: &str) -> usize {
@@ -109,15 +139,20 @@ fn to_number(code: &str) -> usize {
         .unwrap()
 }
 
-fn parse1(input: &str) -> u32 {
+fn calc_presses(input: &str, n_robots: usize) -> u64 {
     input
         .lines()
-        .map(|code| to_number(code) * presses(code).len())
-        .sum::<usize>() as u32
+        // note that there are n robots + 1 human person
+        .map(|code| to_number(code) as u64 * presses(code, n_robots))
+        .sum()
 }
 
-fn parse2(input: &str) -> u32 {
-    0
+fn parse1(input: &str) -> u64 {
+    calc_presses(input, 3)
+}
+
+fn parse2(input: &str) -> u64 {
+    calc_presses(input, 26)
 }
 
 #[cfg(test)]
@@ -158,7 +193,6 @@ mod tests {
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(solve(INPUT, parse2), 248_919_739_734_728);
     }
 }
