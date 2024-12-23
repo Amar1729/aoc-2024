@@ -2,11 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-fn solve(input: &str, parse: fn(&str) -> u32) -> u32 {
-    parse(input)
-}
-
-fn parse1(input: &str) -> u32 {
+fn make_graph(input: &str) -> (HashSet<&str>, HashMap<&str, Vec<&str>>) {
     let mut edges = HashMap::new();
     let mut nodes = HashSet::new();
 
@@ -25,6 +21,12 @@ fn parse1(input: &str) -> u32 {
         edges.entry(n1).or_insert(vec![]).push(n2);
         edges.entry(n2).or_insert(vec![]).push(n1);
     }
+
+    (nodes, edges)
+}
+
+fn parse1(input: &str) -> u32 {
+    let (_, edges) = make_graph(&input);
 
     let mut three_groups = HashSet::new();
 
@@ -53,8 +55,36 @@ fn parse1(input: &str) -> u32 {
         .count() as u32
 }
 
-fn parse2(input: &str) -> u32 {
-    0
+fn parse2(input: &str) -> String {
+    let (nodes, edges) = make_graph(&input);
+
+    let mut largest_group = vec![];
+    for node in nodes {
+        let mut group = vec![node];
+        if let Some(neighbors) = edges.get(node) {
+            for neighbor in neighbors {
+                if group
+                    .iter()
+                    .all(|n| {
+                        edges.get(neighbor).unwrap()
+                            .contains(n)
+                    }) {
+                        group.push(neighbor);
+                }
+            }
+
+            group.sort();
+            if group.len() > largest_group.len() {
+                largest_group = group;
+            }
+        }
+    }
+
+    largest_group
+        .into_iter()
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>()
+        .join(",")
 }
 
 #[cfg(test)]
@@ -98,13 +128,13 @@ td-yn"#;
 
     #[test]
     fn test1() {
-        assert_eq!(solve(TEST1, parse1), 7);
-        assert_eq!(solve(INPUT, parse1), 1411);
+        assert_eq!(parse1(TEST1), 7);
+        assert_eq!(parse1(INPUT), 1411);
     }
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        assert_eq!(parse2(TEST1), "co,de,ka,ta");
+        assert_eq!(parse2(INPUT), "aq,bn,ch,dt,gu,ow,pk,qy,tv,us,yx,zg,zu");
     }
 }
