@@ -1,36 +1,52 @@
 #![allow(dead_code)]
 
-use std::iter;
-use itertools::Itertools;
-
 // need u64 for this problem
 fn solve(input: &str, parse: fn(&str) -> u64) -> u64 {
     parse(input)
 }
 
+// i expected this to need some memoization (at least for part 2) but it turns out this
+// implementation is actually just way faster than my original.
 fn is_valid_line(total: usize, inputs: &[usize], bound: usize) -> bool {
 
-    // a bit annoying that product([], repeat=n) is so verbose
-    for bitstring in iter::repeat_n(0..bound, inputs.len() - 1).multi_cartesian_product() {
+    if inputs.len() == 1 {
+        if inputs[0] == total {
+            return true;
+        } else {
+            return false;
+        }
+    }
 
-        let tot = inputs
-            .iter()
-            .copied()
-            .enumerate()
-            .reduce(|(_, acc), (op_idx, num)| {
-                match bitstring[op_idx - 1] {
-                    0 => (0, acc + num),
-                    1 => (1, acc * num),
-                    2 => (
-                        2,
-                        (acc.to_string() + &num.to_string()).parse().unwrap(),
-                    ),
-                    _ => panic!(),
+    let lhs = &inputs[.. inputs.len() - 1];
+    let rhs = inputs[inputs.len() - 1];
+
+    for op in 0 .. bound {
+        match op {
+            // addition
+            0 => {
+                if total > rhs && is_valid_line(total - rhs, lhs, bound) {
+                    return true;
                 }
-            })
-            .unwrap().1;
-
-        if tot == total { return true };
+            },
+            // multiplication
+            1 => {
+                if total % rhs == 0 && is_valid_line(total / rhs, lhs, bound) {
+                    return true;
+                }
+            },
+            // concat
+            2 => {
+                let mut total_s = total.to_string();
+                let rhs_s = rhs.to_string();
+                if total_s.ends_with(&rhs_s) && total_s.len() > rhs_s.len() {
+                    total_s = total_s[.. total_s.len() - rhs_s.len()].to_string();
+                    if is_valid_line(total_s.parse().unwrap(), lhs, bound) {
+                        return true;
+                    }
+                }
+            },
+            _ => panic!(),
+        }
     }
 
     false
