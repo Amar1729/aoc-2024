@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use itertools::Itertools;
+use rayon::prelude::*;
 use utils::{Point, parse_with_lens};
 use std::collections::{HashMap, HashSet};
 
@@ -91,8 +91,9 @@ fn count_cheats(input: &str, cheat_len: usize, threshold: usize) -> u32 {
         .collect();
 
     path_with_distances
-        .iter()
-        .flat_map(|(p, orig)| {
+        // slap a par in there, get a 4x speedup, ez
+        .par_iter()
+        .map(|(p, orig)| {
             // find locations at most cheat_len spaces away
             p.successors(cheat_len)
                 .iter()
@@ -108,17 +109,7 @@ fn count_cheats(input: &str, cheat_len: usize, threshold: usize) -> u32 {
 
                     None
                 })
-                .collect::<Vec<_>>()
-                // .count()
-        })
-        .sorted()
-        .counts()
-        .iter()
-        // for debugging
-        // .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
-        .map(|(_, count)| {
-            // println!("{count} {time_saved}");
-            count
+                .count()
         })
         .sum::<usize>() as u32
 }
