@@ -2,14 +2,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-fn solve(input: &str, parse: fn(&str) -> u64) -> u64 {
-    parse(input)
-}
-
-fn parse1(input: &str) -> u64 {
+fn parse_rules_and_values<'a>(input: &'a str) -> (HashSet<(Vec<&'a str>, &'a str)>, HashMap<&'a str, Option<bool>>) {
     let mut values: HashMap<&str, Option<bool>> = HashMap::new();
     let mut rules = HashSet::new();
-    let mut z_gates = HashSet::new();
 
     let mut iter = input.lines();
     for line in iter.by_ref() {
@@ -29,70 +24,12 @@ fn parse1(input: &str) -> u64 {
         if !values.contains_key(rhs) {
             values.insert(rhs, None);
         }
-
-        if rhs.starts_with("z") && !z_gates.contains(rhs) {
-            z_gates.insert(rhs);
-        }
     }
 
-    println!("{z_gates:?}");
-    // assumes none are set at beginning?
-    let mut z_gates = vec![None; z_gates.len()];
+    (rules, values)
+}
 
-    loop {
-        for (lhs, rhs) in &rules {
-            match (lhs[0], lhs[1], lhs[2]) {
-                (op1, "AND", op2) => {
-                    if let Some(&Some(v1)) = values.get(op1) {
-                        if let Some(&Some(v2)) = values.get(op2) {
-                            let result = Some(v1 & v2);
-                            values.get_mut(rhs).map(|val| { *val = result; });
-
-                            if rhs.starts_with("z") {
-                                z_gates[rhs[1..].parse::<usize>().unwrap()] = result;
-                            }
-                        }
-                    }
-                },
-
-                (op1, "OR", op2) => {
-                    if let Some(&Some(v1)) = values.get(op1) {
-                        if let Some(&Some(v2)) = values.get(op2) {
-                            let result = Some(v1 | v2);
-                            values.get_mut(rhs).map(|val| { *val = result; });
-
-                            if rhs.starts_with("z") {
-                                z_gates[rhs[1..].parse::<usize>().unwrap()] = result;
-                            }
-                        }
-                    }
-                },
-
-                (op1, "XOR", op2) => {
-                    if let Some(&Some(v1)) = values.get(op1) {
-                        if let Some(&Some(v2)) = values.get(op2) {
-                            let result = Some(v1 ^ v2);
-                            values.get_mut(rhs).map(|val| { *val = result; });
-
-                            if rhs.starts_with("z") {
-                                z_gates[rhs[1..].parse::<usize>().unwrap()] = result;
-                            }
-                        }
-                    }
-                },
-
-                _ => panic!(),
-            }
-        }
-
-        for (gate, value) in &values {
-            println!("{gate}: {value:?}");
-        }
-        println!();
-
-        if z_gates.iter().all(|b| b.is_some()) { break; }
-    }
-
+fn z_gates_to_num(z_gates: &[Option<bool>]) -> u64 {
     isize::from_str_radix(
         &z_gates
             .iter()
@@ -104,8 +41,58 @@ fn parse1(input: &str) -> u64 {
         .unwrap() as u64
 }
 
-fn parse2(input: &str) -> u64 {
-    0
+fn simulate<'a>(rules: &HashSet<(Vec<&str>, &'a str)>, values: &mut HashMap<&'a str, Option<bool>>) -> u64 {
+    let z_gates = rules
+        .iter()
+        .filter_map(|(_, rhs)| {
+            if rhs.starts_with("z") {
+                Some(rhs)
+            } else { None }
+        })
+        .collect::<HashSet<_>>();
+
+    // assumes none are set at beginning?
+    let mut z_gates = vec![None; z_gates.len()];
+
+    loop {
+        for (lhs, rhs) in rules {
+
+            if let Some(&Some(v1)) = values.get(lhs[0]) {
+                if let Some(&Some(v2)) = values.get(lhs[2]) {
+                    let result = match lhs[1] {
+                        "AND" => Some(v1 & v2),
+                        "OR" => Some(v1 | v2),
+                        "XOR" => Some(v1 ^ v2),
+                        _ => panic!(),
+                    };
+                    values.get_mut(rhs).map(|val| { *val = result; });
+
+                    if rhs.starts_with("z") {
+                        z_gates[rhs[1..].parse::<usize>().unwrap()] = result;
+                    }
+                }
+            }
+        }
+
+        // for (gate, value) in &values {
+        //     println!("{gate}: {value:?}");
+        // }
+        // println!();
+
+        if z_gates.iter().all(|b| b.is_some()) { return z_gates_to_num(&z_gates); }
+    }
+}
+
+fn parse1(input: &str) -> u64 {
+    let (rules, mut values) = parse_rules_and_values(input);
+    simulate(&rules, &mut values)
+}
+
+fn parse2(input: &str) -> String {
+    let (rules, values) = parse_rules_and_values(input);
+    // let result = simulate(&rules, &mut values.clone());
+
+    String::new()
 }
 
 #[cfg(test)]
@@ -175,14 +162,14 @@ tnw OR pbm -> gnj"#;
 
     #[test]
     fn test1() {
-        assert_eq!(solve(TEST1, parse1), 4);
-        assert_eq!(solve(TEST2, parse1), 2024);
-        assert_eq!(solve(INPUT, parse1), 52956035802096);
+        assert_eq!(parse1(TEST1), 4);
+        assert_eq!(parse1(TEST2), 2024);
+        assert_eq!(parse1(INPUT), 52956035802096);
     }
 
     #[test]
     fn test2() {
-        assert_eq!(solve(TEST1, parse2), 0);
-        assert_eq!(solve(INPUT, parse2), 0);
+        // assert_eq!(parse2(TEST1), 0);
+        assert_eq!(parse2(INPUT), "");
     }
 }
