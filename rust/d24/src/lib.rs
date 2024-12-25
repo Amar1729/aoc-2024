@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::{HashMap, HashSet};
+use itertools::Itertools;
 
 fn parse_rules_and_values<'a>(input: &'a str) -> (HashSet<(Vec<&'a str>, &'a str)>, HashMap<&'a str, Option<bool>>) {
     let mut values: HashMap<&str, Option<bool>> = HashMap::new();
@@ -29,9 +30,26 @@ fn parse_rules_and_values<'a>(input: &'a str) -> (HashSet<(Vec<&'a str>, &'a str
     (rules, values)
 }
 
-fn z_gates_to_num(z_gates: &[Option<bool>]) -> u64 {
-    isize::from_str_radix(
-        &z_gates
+fn collect_gates(prefix: &str, values: &HashMap<&str, Option<bool>>) -> u64 {
+    gates_to_num(
+        &values
+            .iter()
+            .filter(|(k, _)| k.starts_with(prefix))
+            // kill me, this doesn't do lexical sorting???
+            // .sorted_by(|a, b| Ord::cmp(a.1, b.1))
+            .sorted_by(|(k1, _), (k2, _)| {
+                let label1 = k1[1..].parse::<usize>().unwrap();
+                let label2 = k2[1..].parse::<usize>().unwrap();
+                Ord::cmp(&label1, &label2)
+            })
+            .map(|(_, v)| *v)
+            .collect::<Vec<Option<bool>>>()
+    )
+}
+
+fn gates_to_num(gates: &[Option<bool>] ) -> u64 {
+    usize::from_str_radix(
+        &gates
             .iter()
             .rev()
             .map(|b| (b.unwrap() as usize).to_string())
@@ -79,7 +97,7 @@ fn simulate<'a>(rules: &HashSet<(Vec<&str>, &'a str)>, values: &mut HashMap<&'a 
         // }
         // println!();
 
-        if z_gates.iter().all(|b| b.is_some()) { return z_gates_to_num(&z_gates); }
+        if z_gates.iter().all(|b| b.is_some()) { return gates_to_num(&z_gates); }
     }
 }
 
@@ -89,10 +107,150 @@ fn parse1(input: &str) -> u64 {
 }
 
 fn parse2(input: &str) -> String {
-    let (rules, values) = parse_rules_and_values(input);
-    // let result = simulate(&rules, &mut values.clone());
+    let (mut rules, values) = parse_rules_and_values(input);
 
-    String::new()
+    // just print out the actual graph
+    print_digraph(input);
+
+    // visually determined by inspecting graphviz output
+    let swaps = &[
+        ("z07", "vmv"),
+        ("z20", "kfm"),
+        ("hnv", "z28"),
+        ("hth", "tqr"),
+    ];
+
+    // i can't figure out how to allow this to be borrowed mutably and immutably?
+    // i guess the problem is that it uses &str which have a lifetime too short? not sure?
+    let orig_rules = rules.clone();
+    for (out1, out2) in swaps {
+        let swap1 = orig_rules.iter().find(|(_, r)| r == out1).unwrap();
+        let swap2 = orig_rules.iter().find(|(_, r)| r == out2).unwrap();
+
+        rules.remove(&swap1);
+        rules.remove(&swap2);
+        rules.insert((swap1.0.clone(), swap2.1));
+        rules.insert((swap2.0.clone(), swap1.1));
+    }
+
+    let x = collect_gates("x", &values);
+    let y = collect_gates("y", &values);
+
+    let result = simulate(&rules, &mut values.clone());
+
+    println!("   {x}\n+  {y}\n=  {result}");
+    println!("   {x:b}\n+  {y:b}\n= {result:b}");
+
+    assert_eq!(x+y, result);
+
+    swaps
+        .iter()
+        .flat_map(|(out1, out2)| vec![out1, out2])
+        // ??? apparently this works, while sorted_by (above) does not
+        .sorted()
+        .join(",")
+}
+
+fn print_digraph(input: &str) {
+    let mut wires = HashMap::new();
+    println!("digraph G {{");
+
+    for i in 0 .. 46 {
+        if i < 45 {
+            let key = format!("x{i:02}");
+            println!("  {} [pos=\"{},{}!\"]", key, i*2, 5);
+            let value = key.clone();
+            wires.insert(key, vec![value]);
+
+            let key = format!("y{i:02}");
+            println!("  {} [pos=\"{},{}!\"]", key, i*2+1, 5);
+            let value = key.clone();
+            wires.insert(key, vec![value]);
+        }
+
+        let key = format!("z{i:02}");
+        println!("  {} [pos=\"{},{}!\"]", key, i*2, 0);
+    }
+
+    println!();
+    let (_, suffix) = input.split_once("\n\n").unwrap();
+
+    for (name, line) in suffix.lines().enumerate() {
+        let tokens: Vec<_> = line.split(' ').collect();
+        let [_, _, _, _, to] = tokens[..] else { unreachable!() };
+        wires.entry(String::from(to)).or_insert_with(Vec::new).push(format!("{name}"));
+    }
+
+    let mut second = HashMap::new();
+
+    for (name, line) in suffix.lines().enumerate() {
+        let tokens: Vec<_> = line.split(' ').collect();
+        let [left, op, right, _, to] = tokens[..] else { unreachable!() };
+
+        let shape = match op {
+            "AND" => "square",
+            "OR" => "hexagon",
+            "XOR" => "triangle",
+            _ => unreachable!(),
+        };
+
+        if left.starts_with('x') || right.starts_with('x') {
+            // let i: usize = left.unsigned();
+            let i: usize = left[1..].parse().unwrap();
+            if op == "AND" {
+                println!("{} [pos=\"{},{}!\"]", name, i * 2 + 1, 4);
+                second.insert(to, i);
+            }
+            if op == "XOR" {
+                println!("{} [pos=\"{},{}!\"]", name, i * 2, 4);
+                second.insert(to, i);
+            }
+        }
+        if to.starts_with('z') {
+            // let i: usize = to.unsigned();
+            let i: usize = to[1..].parse().unwrap();
+            println!("{} [pos=\"{},{}!\"]", name, i * 2, 1);
+        }
+
+        println!("  {name} [shape={shape}]");
+        for edge in &wires[&String::from(left)] {
+            println!("  {edge} -> {name} [label=\"{left}\"]");
+        }
+        for edge in &wires[&String::from(right)] {
+            println!("  {edge} -> {name} [label=\"{right}\"]");
+        }
+    }
+
+    for (name, line) in suffix.lines().enumerate() {
+        let tokens: Vec<_> = line.split(' ').collect();
+        let [left, op, right, _, _] = tokens[..] else { unreachable!() };
+
+        if op == "AND" {
+            if let Some(i) = second.get(left) {
+                println!("{} [pos=\"{},{}!\"]", name, i * 2 + 1, 3);
+            }
+            if let Some(i) = second.get(right) {
+                println!("{} [pos=\"{},{}!\"]", name, i * 2 + 1, 3);
+            }
+        }
+        if op == "OR" {
+            if let Some(i) = second.get(left) {
+                println!("{} [pos=\"{},{}!\"]", name, i * 2 + 1, 2);
+            }
+            if let Some(i) = second.get(right) {
+                println!("{} [pos=\"{},{}!\"]", name, i * 2 + 1, 2);
+            }
+        }
+    }
+
+    for i in 0..46 {
+        let key = format!("z{i:02}");
+        for edge in &wires[&key] {
+            println!("  {edge} -> {key}");
+        }
+    }
+
+    println!("}}");
 }
 
 #[cfg(test)]
@@ -169,7 +327,6 @@ tnw OR pbm -> gnj"#;
 
     #[test]
     fn test2() {
-        // assert_eq!(parse2(TEST1), 0);
-        assert_eq!(parse2(INPUT), "");
+        assert_eq!(parse2(INPUT), "hnv,hth,kfm,tqr,vmv,z07,z20,z28");
     }
 }
